@@ -12,7 +12,7 @@ class FlutterMobileVisionFaceApi {
   }
 
   static Future<String> face(
-      {String folderName: '/FlutterMobileVision'}) async {
+      {String folderName: 'FlutterMobileVision'}) async {
     Map<String, dynamic> arguments = {
       'FOLDER_NAME': folderName,
     };
