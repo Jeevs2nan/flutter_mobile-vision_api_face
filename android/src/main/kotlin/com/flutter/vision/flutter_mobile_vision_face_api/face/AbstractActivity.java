@@ -1,9 +1,10 @@
 package com.flutter.vision.flutter_mobile_vision_face_api.face;
 
 import android.content.Intent;
-import android.support.v7.app.AppCompatActivity;
 
 import com.google.android.gms.common.api.CommonStatusCodes;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 public class AbstractActivity extends AppCompatActivity {
 

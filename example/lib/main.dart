@@ -13,6 +13,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   String _platformVersion = 'Unknown';
+  String _picturePath = 'NIL';
 
   @override
   void initState() {
@@ -37,6 +38,7 @@ class _MyAppState extends State<MyApp> {
 
     setState(() {
       _platformVersion = platformVersion;
+      //_picturePath = path;
     });
   }
 
@@ -48,9 +50,30 @@ class _MyAppState extends State<MyApp> {
           title: const Text('Plugin example app'),
         ),
         body: Center(
-          child: Text('Running on: $_platformVersion\n'),
-        ),
+            child: Column(
+          children: <Widget>[
+            Text('Running on: $_platformVersion\n'),
+            Text(
+              'Detected Face is saved in : $_picturePath\n',
+            ),
+            RaisedButton(
+              onPressed: _onButtonClick,
+              child: Text('Open Camera'),
+            )
+          ],
+        )),
       ),
     );
+  }
+
+  Future _onButtonClick() async {
+    String path = await FlutterMobileVisionFaceApi.face();
+
+    if (!mounted) return;
+
+    setState(() {
+      //_platformVersion = platformVersion;
+      _picturePath = path;
+    });
   }
 }

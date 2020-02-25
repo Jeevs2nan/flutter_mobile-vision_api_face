@@ -11,8 +11,6 @@ import android.hardware.Camera;
 import android.media.ExifInterface;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.v4.app.ActivityCompat;
-import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -21,11 +19,17 @@ import android.widget.LinearLayout;
 
 import com.flutter.vision.flutter_mobile_vision_face_api.R;
 import com.flutter.vision.flutter_mobile_vision_face_api.face.custom.CameraPreview;
+import com.google.android.gms.common.api.CommonStatusCodes;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
+import javax.xml.transform.Result;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
+import androidx.core.app.ActivityCompat;
 
 public class CameraActivity extends AbstractActivity {
 
@@ -39,10 +43,10 @@ public class CameraActivity extends AbstractActivity {
     public static Bitmap bitmap;
     int cameraId;
     private boolean safeToTakePicture = false;
-    String TAG  = CameraActivity.class.getName();
+    String TAG = CameraActivity.class.getName();
     private String folderName = null;
-
-
+    private boolean NEED_PERMISSION = false;
+    private final int INTENT_REQUEST_CODE = 002;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,12 +61,6 @@ public class CameraActivity extends AbstractActivity {
 
         setContentView(R.layout.camera_layout);
 
-
-        int rc = ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
-        if (rc == PackageManager.PERMISSION_GRANTED) {
-
-        }
-
         Bundle bundle = getIntent().getExtras();
         if (bundle != null) {
             folderName = bundle.getString(FOLDER_NAME);
@@ -73,12 +71,20 @@ public class CameraActivity extends AbstractActivity {
 
         myContext = this;
 
-        mCamera = Camera.open();
-
-        mCamera.setDisplayOrientation(90);
         cameraPreview = (LinearLayout) findViewById(R.id.cPreview);
-        mPreview = new CameraPreview(myContext, mCamera);
-        cameraPreview.addView(mPreview);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            int rc = ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
+            if (rc != PackageManager.PERMISSION_GRANTED) {
+                requestPermission();
+            } else {
+                NEED_PERMISSION = false;
+                openCamera();
+            }
+        } else {
+            NEED_PERMISSION = false;
+            openCamera();
+        }
 
         capture = (ImageView) findViewById(R.id.btnCam);
         capture.setOnClickListener(new View.OnClickListener() {
@@ -108,14 +114,38 @@ public class CameraActivity extends AbstractActivity {
                 }
             }
         });
-
-
-        //Start the Camera Preview...
-        mCamera.startPreview();
-        safeToTakePicture = true;
     }
 
 
+
+    private void requestPermission() {
+        NEED_PERMISSION = true;
+        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA},  001 );
+    }
+
+    private void openCamera() {
+        mCamera = Camera.open();
+        mCamera.setDisplayOrientation(90);
+        mPreview = new CameraPreview(myContext, mCamera);
+        cameraPreview.addView(mPreview);
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        /*mCamera = Camera.open();
+
+        mCamera.setDisplayOrientation(90);
+        cameraPreview = (LinearLayout) findViewById(R.id.cPreview);
+        mPreview = new CameraPreview(myContext, mCamera);
+        cameraPreview.addView(mPreview);*/
+
+        //Start the Camera Preview...
+        if (mCamera != null) {
+            mCamera.startPreview();
+            safeToTakePicture = true;
+        }
+    }
 
     private int findFrontFacingCamera() {
 
@@ -148,9 +178,7 @@ public class CameraActivity extends AbstractActivity {
                 cameraId = i;
                 cameraFront = false;
                 break;
-
             }
-
         }
         return cameraId;
     }
@@ -158,7 +186,7 @@ public class CameraActivity extends AbstractActivity {
 
     public void onResume() {
         super.onResume();
-        if (mCamera == null) {
+        if (mCamera == null && !NEED_PERMISSION) {
             mCamera = Camera.open();
             mCamera.setDisplayOrientation(90);
             mPicture = getPictureCallback();
@@ -215,6 +243,26 @@ public class CameraActivity extends AbstractActivity {
         }
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == 001) {
+            for (int i = 0; i < permissions.length; i++) {
+                int grantResult = grantResults[i];
+
+                if (grantResult != PackageManager.PERMISSION_GRANTED) {
+                    requestPermission();
+                    break;
+                } else {
+                    NEED_PERMISSION = false;
+                    openCamera();
+                    onStart();
+                }
+            }
+        }
+    }
+
     private Camera.PictureCallback getPictureCallback() {
         Camera.PictureCallback picture = new Camera.PictureCallback() {
             @RequiresApi(api = Build.VERSION_CODES.N)
@@ -225,16 +273,36 @@ public class CameraActivity extends AbstractActivity {
                 safeToTakePicture = true;
                 //saveImage(bitmap);
                 Intent intent = new Intent(CameraActivity.this, PreviewPicture.class);
-                startActivity(intent);
+                startActivityForResult(intent, INTENT_REQUEST_CODE);
             }
         };
         return picture;
     }
 
 
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        switch (requestCode) {
+            case INTENT_REQUEST_CODE:
+                if (resultCode == CommonStatusCodes.SUCCESS) {
+                    if (data != null && data.getExtras() != null) {
+                      String picPath =  data.getExtras().getString(OBJECT);
+                      if (!TextUtils.isEmpty(picPath)) {
+                          Intent intent = new Intent();
+                          intent.putExtra(CameraActivity.OBJECT, picPath);
+                          setResult(CommonStatusCodes.SUCCESS, intent);
+                          finish();
+                      }
+                    }
+                }
+                break;
+        }
+    }
+
     @RequiresApi(api = Build.VERSION_CODES.N)
-    Bitmap loadAndResizeBitmap(byte[] data)
-    {
+    Bitmap loadAndResizeBitmap(byte[] data) {
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inJustDecodeBounds = true;
         BitmapFactory.decodeByteArray(data, 0, data.length, options);
@@ -242,8 +310,7 @@ public class CameraActivity extends AbstractActivity {
         int REQUIRED_SIZE = 100;
         int width_tmp = options.outWidth, height_tmp = options.outHeight;
         int scale = 4;
-        while (true)
-        {
+        while (true) {
             if (width_tmp / 2 < REQUIRED_SIZE || height_tmp / 2 < REQUIRED_SIZE)
                 break;
             width_tmp /= 2;
@@ -256,8 +323,7 @@ public class CameraActivity extends AbstractActivity {
         Bitmap resizedBitmap = BitmapFactory.decodeByteArray(data, 0, data.length, options);
 
         ExifInterface exif = null;
-        try
-        {
+        try {
             ByteArrayInputStream bs = new ByteArrayInputStream(data);
             exif = new ExifInterface(bs);
             String orientation = exif.getAttribute(ExifInterface.TAG_ORIENTATION);
@@ -276,9 +342,7 @@ public class CameraActivity extends AbstractActivity {
 
 
             return resizedBitmap;
-        }
-        catch (IOException ex)
-        {
+        } catch (IOException ex) {
             return null;
         }
     }
