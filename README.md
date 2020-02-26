@@ -12,7 +12,7 @@ Add the below line in <b>pubspec.yaml</b>. For the latest version, please visit 
 
 
 ```
-flutter_mobile_vision_api_face: ^0.0.2
+flutter_mobile_vision_api_face: ^0.0.3
 ```
 
 
